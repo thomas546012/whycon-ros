@@ -8,7 +8,6 @@ It can be used both off-line, as a source of ground-truth for robotics experimen
 _WhyCon_ is meant as an alternative to widely used and expensive localization systems. It is fully open-source.
 _WhyCon-orig_ is WhyCon's original, minimalistic version that was supposed to be ROS and openCV independent.
 
-
 | WhyCon example application (video)  | Scenario description |
 | ------ | ----------- |
 |[![WhyCon applications](https://raw.githubusercontent.com/wiki/gestom/WhyCon/pics/whycon.png)](https://www.youtube.com/watch?v=KgKrN8_EmUA"AAAA")|-precise docking to a charging station (EU project STRANDS),<br/> -fitness evaluation for self-evolving robots (EU proj. SYMBRION),<br/>-relative localization of UAV-UGV formations (CZ-USA project COLOS),<br/>-energy source localization in (EU proj REPLICATOR),<br/>-robotic swarm localization (EU proj HAZCEPT).|
