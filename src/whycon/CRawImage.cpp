@@ -23,6 +23,27 @@ CRawImage::~CRawImage()
     std::free(data_);
 }
 
+void CRawImage::draw_point(int x, int y, int r, int g, int b)
+{
+    int pos;
+    for(int a = -3; a < 3; a++)
+    {
+        for(int b = -3; b < 3; b++)
+        {
+            if((a < -1 || a > 0) && (b < -1 || b > 0))
+                continue;
+
+            pos = (x + a) + (y + b) * width_;
+            if(pos > 0 && pos < width_ * height_)
+            {
+                data_[bpp_ * pos + 0] = r;
+                data_[bpp_ * pos + 1] = g;
+                data_[bpp_ * pos + 2] = b;
+            }
+        }
+    }
+}
+
 void CRawImage::updateImage(unsigned char* new_data, int width, int height, int bpp)
 {
     if(width_ != width || height_ != height || bpp_ != bpp)

@@ -27,6 +27,8 @@ public:
 
   void drawGuideCalibration(int calib_num, float dim_x, float dim_y);
 
+  void draw_point(int x, int y, int r, int g, int b);
+
 
 
   void plotLine(int x, int y);
