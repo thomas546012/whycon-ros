@@ -93,6 +93,7 @@ void CWhycon::selectMarker(float x, float y)
 {
     // if(mancalibrate_)
     // {
+        static int idx = 0;
         if (calib_num_ < 4 && calib_step_ > calibration_steps_)
         {
             calib_step_ = 0;
@@ -100,11 +101,12 @@ void CWhycon::selectMarker(float x, float y)
         }
         if (num_markers_ > 0)
         {
-            current_marker_array_[0].seg.x = x; 
-            current_marker_array_[0].seg.y = y;
-            current_marker_array_[0].seg.valid = true;
-            detector_array_[0]->localSearch = true;
+            current_marker_array_[idx].seg.x = x;
+            current_marker_array_[idx].seg.y = y;
+            current_marker_array_[idx].seg.valid = true;
+            detector_array_[idx]->localSearch = true;
         }
+        idx = (++idx) % num_markers_;
     // }
     // else
     // {
@@ -282,7 +284,7 @@ void CWhycon::processImage(CRawImage *image, std::vector<SMarker> &whycon_detect
     // draw stuff on the GUI
     if(use_gui_)
     {
-        image->drawTimeStats(eval_time_, num_markers_);
+        image->drawTimeStats(eval_time_, num_found_);
 
         if(mancalibrate_)
         {

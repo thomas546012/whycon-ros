@@ -440,13 +440,13 @@ SEllipseCenters CTransformation::calcEigen(const float *data)
             result.t[idx][1] = -t0;
             result.t[idx][2] = -t1;
 
+            // std::printf("calcEigen %d %f %f %f \t %f %f %f\n", idx, t0, t1, t2, n0, n1, n2);
+
             reTransformXY(t0, t1, t2);
             result.u[idx] = t0;
             result.v[idx] = t1;
 
             idx++;
-
-            // std::printf("calcEigen %d %.3f %.3f %.3f \t %.3f %.3f %.3f\n", idx - 1, t0, t1, t2, n0, n1, n2);
         }
     }
 

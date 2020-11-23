@@ -1,5 +1,7 @@
 #include <cstdio>
 #include "whycon/CCircleDetect.h"
+#include <vector>
+#include <algorithm>
 
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -522,7 +524,6 @@ SMarker CCircleDetect::findSegment(CRawImage* image, SSegment init)
     if (outer.valid)
     {
         ellipse_centers = trans_->calcSolutions(outer);
-        
         if(identify)
             ambiguityAndObtainCode(image);
         else
@@ -533,7 +534,7 @@ SMarker CCircleDetect::findSegment(CRawImage* image, SSegment init)
     }
 
     // drawing results 
-    if (outer.valid && false)
+    if (outer.valid)// && false)
     {
         for (int p = queueOldStart; p < queueEnd; p++)
         {
@@ -543,6 +544,10 @@ SMarker CCircleDetect::findSegment(CRawImage* image, SSegment init)
             image->data_[step * pos + 2] = 0;
         }
     }
+
+    // image->draw_point(outer.x, outer.y, 0, 0, 0);
+    // image->draw_point(ellipse_centers.u[0], ellipse_centers.v[0], 255, 0, 0);
+    // image->draw_point(ellipse_centers.u[1], ellipse_centers.v[1], 0, 255, 0);
 
     if (draw_)
     {
@@ -590,20 +595,21 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
 {
     int segIdx = 0;
 
-    SSegSmall tmp[2];
-    tmp[0].x = ellipse_centers.u[0];
-    tmp[0].y = ellipse_centers.v[0];
+    SSegSmall tmp[4];
+    tmp[0].x = (ellipse_centers.u[0]*(37.0/70.0) + (33.0/70.0)*outer.x);
+    tmp[0].y = (ellipse_centers.v[0]*(37.0/70.0) + (33.0/70.0)*outer.y);
     tmp[0].m0 = 0.33 / 0.70 * outer.m0;
     tmp[0].m1 = 0.33 / 0.70 * outer.m1;
     tmp[0].v0 = outer.v0;
     tmp[0].v1 = outer.v1;
 
-    tmp[1].x = ellipse_centers.u[1];
-    tmp[1].y = ellipse_centers.v[1];
+    tmp[1].x = (ellipse_centers.u[1]*(37.0/70.0) + (33.0/70.0)*outer.x);
+    tmp[1].y = (ellipse_centers.v[1]*(37.0/70.0) + (33.0/70.0)*outer.y);
     tmp[1].m0 = 0.33 / 0.70 * outer.m0;
     tmp[1].m1 = 0.33 / 0.70 * outer.m1;
     tmp[1].v0 = outer.v0;
     tmp[1].v1 = outer.v1;
+    // printf("modified centers 0: %f %f 1: %f %f\n", tmp[0].x, tmp[0].y, tmp[1].x, tmp[1].y);
 
     float sum[2] = {0.0, 0.0};
     float variance[2] = {0.0, 0.0};
@@ -670,6 +676,7 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
         float sx, sy;
         sx = sy = 0;
         numPoints[i] = 0;
+        // float directX = 0, directY = 0;
         if (smooth[i][idSamples - 1] != smooth[i][0])
         {
             sx = 1;
@@ -682,6 +689,8 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
                 sx += cos(2 * M_PI * a / segmentWidth);
                 sy += sin(2 * M_PI * a / segmentWidth);
                 numPoints[i]++;
+                // directX += x[i][a];
+                // directY += y[i][a];
                 if (debug)
                     printf("%i ", a);
             }
@@ -692,7 +701,12 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
 
         float meanX = sx / numPoints[i];
         float meanY = sy / numPoints[i];
+        // printf("meanX %f meanY %f directX %f directY %f\n", meanX, meanY, directX / numPoints[i], directY / numPoints[i]);
         float errX, errY;
+
+        // float meanAng = atan2(sy, sx);
+        // std::vector<float> errs;
+
         sx = sy = 0;
         if (smooth[i][idSamples - 1] != smooth[i][0])
             sx = 1;
@@ -702,13 +716,27 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
             {
                 sx = cos(2 * M_PI * a / segmentWidth);
                 sy = sin(2 * M_PI * a / segmentWidth);
+                // float tmpAng = atan2(sy, sx);
+                // errs.push_back(atan2(sin(meanAng - tmpAng), cos(meanAng - tmpAng)));
                 errX = sx - meanX;
                 errY = sy - meanY;
                 sum[i] += errX * errX + errY * errY;
+                // printf("sx %f sy %f errX %f errY %f dirX %f dirY %f dirEX %f dirEY %f\n", sx, sy, errX, errY, x[i][a], y[i][a], x[i][a] - (directX / numPoints[i]), y[i][a] - (directY / numPoints[i]));
             }
         }
+        // float sumSin = 0;
+        // float sumCos = 0;
+        // for(auto e : errs){
+        //     sumSin += sin(e);
+        //     sumCos += cos(e);
+        // }
+        // sumSin /= (float)errs.size();
+        // sumCos /= (float)errs.size();
+        // float valR = sqrt(sumSin * sumSin + sumCos * sumCos);
+        // float stdAng = sqrt(-2 * log(valR));
+
         variance[i] = sum[i] / numPoints[i];
-        printf("idx %d var %f sum %f numPoints %f\n", i, variance[i], sum[i], numPoints[i]);
+        // printf("idx %d stdAngErr %.9f var %.12f sum %.12f numPoints %.0f\n", i, stdAng, variance[i], sum[i], numPoints[i]);
 
         //determine raw code
         for (int a = 0; a < idBits * 2; a++)
@@ -721,7 +749,166 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
         segIdx = 0;
     else
         segIdx = 1;
-    printf("solution %d\n\n", segIdx);
+
+    // printf("solution %d\n", segIdx);
+    // printf("\n");
+
+    /*  printf("ORIG signal 0: ");
+        for (int a = 0; a < idSamples; a++) printf("%.2f ", signal[0][a]);
+        printf("\nsmooth 0: ");
+        for (int a = 0; a < idSamples; a++) printf("%.2f ", smooth[0][a]);
+        printf("\n");
+        printf("ORIG signal 1: ");
+        for (int a = 0; a < idSamples; a++) printf("%.2f ", signal[1][a]);
+        printf("\nsmooth 1: ");
+        for (int a = 0; a < idSamples; a++) printf("%.2f ", smooth[1][a]);
+        printf("\n"); */
+
+    int decision_idSamples = 360;
+    float decision_x[4][decision_idSamples];
+    float decision_y[4][decision_idSamples];
+    float decision_signal[4][decision_idSamples];
+
+    float center_dist = sqrt((ellipse_centers.u[0] - ellipse_centers.u[1]) * (ellipse_centers.u[0] - ellipse_centers.u[1]) + \
+            (ellipse_centers.v[0] - ellipse_centers.v[1]) * (ellipse_centers.v[0] - ellipse_centers.v[1]));
+
+    // printf("out-el0 %f out-el1 %f el0-el1 %f m0 %f m1 %f\n", \
+    //     sqrt((outer.x - ellipse_centers.u[0]) * (outer.x - ellipse_centers.u[0]) + (outer.y - ellipse_centers.v[0]) * (outer.y - ellipse_centers.v[0])),
+    //     sqrt((outer.x - ellipse_centers.u[1]) * (outer.x - ellipse_centers.u[1]) + (outer.y - ellipse_centers.v[1]) * (outer.y - ellipse_centers.v[1])),
+    //     sqrt((ellipse_centers.u[0] - ellipse_centers.u[1]) * (ellipse_centers.u[0] - ellipse_centers.u[1]) + \
+    //         (ellipse_centers.v[0] - ellipse_centers.v[1]) * (ellipse_centers.v[0] - ellipse_centers.v[1])),
+    //     0.42 / 0.70 * outer.m0,
+    //     0.42 / 0.70 * outer.m1
+    //     );
+
+    float decision_ratio = 7.0;
+    float decision_outer_ratio = 0.42 / 0.70;
+
+    tmp[0].m0 = decision_outer_ratio * outer.m0;
+    tmp[0].m1 = decision_outer_ratio * outer.m1;
+    tmp[0].v0 = outer.v0;
+    tmp[0].v1 = outer.v1;
+
+    tmp[1] = tmp[0];
+    tmp[2] = tmp[0];
+    tmp[3] = tmp[0];
+
+    tmp[0].x = ellipse_centers.u[0] + (outer.x - ellipse_centers.u[0]) * decision_outer_ratio;
+    tmp[0].y = ellipse_centers.v[0] + (outer.y - ellipse_centers.v[0]) * decision_outer_ratio;
+
+    tmp[1].x = (ellipse_centers.u[0] + (outer.x - ellipse_centers.u[0]) * decision_outer_ratio * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1));
+    tmp[1].y = (ellipse_centers.v[0] + (outer.y - ellipse_centers.v[0]) * decision_outer_ratio * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1));
+    tmp[1].m0 = tmp[0].m0 * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1);
+    tmp[1].m1 = tmp[0].m1 * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1);
+
+    tmp[2].x = ellipse_centers.u[1] + (outer.x - ellipse_centers.u[1]) * decision_outer_ratio;
+    tmp[2].y = ellipse_centers.v[1] + (outer.y - ellipse_centers.v[1]) * decision_outer_ratio;
+
+    tmp[3].x = (ellipse_centers.u[1] + (outer.x - ellipse_centers.u[1]) * decision_outer_ratio * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1));
+    tmp[3].y = (ellipse_centers.v[1] + (outer.y - ellipse_centers.v[1]) * decision_outer_ratio * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1));
+    tmp[3].m0 = tmp[2].m0 * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1);
+    tmp[3].m1 = tmp[2].m1 * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1);
+
+    for(int i = 0; i < 4; i++)
+    {
+        //calculate appropriate positions
+        for (int a = 0; a < decision_idSamples; a++)
+        {
+            decision_x[i][a] = tmp[i].x+(tmp[i].m0*cos((float)a/decision_idSamples*2*M_PI)*tmp[i].v0+tmp[i].m1*sin((float)a/decision_idSamples*2*M_PI)*tmp[i].v1)*2.0;
+            decision_y[i][a] = tmp[i].y+(tmp[i].m0*cos((float)a/decision_idSamples*2*M_PI)*tmp[i].v1-tmp[i].m1*sin((float)a/decision_idSamples*2*M_PI)*tmp[i].v0)*2.0;
+        }
+
+        //retrieve the image brightness on these using bilinear transformation
+        float gx, gy;
+        int px, py;
+        unsigned char* ptr = image->data_;
+        for (int a = 0; a < decision_idSamples; a++)
+        {
+            px = decision_x[i][a];
+            py = decision_y[i][a];
+            gx = decision_x[i][a]-px;
+            gy = decision_y[i][a]-py;
+            pos = (px+py*image->width_);
+
+            /*detection from the image*/
+            decision_signal[i][a]  = ptr[(pos+0)*step+0]*(1-gx)*(1-gy)+ptr[(pos+1)*step+0]*gx*(1-gy)+ptr[(pos+image->width_)*step+0]*(1-gx)*gy+ptr[step*(pos+image->width_+1)+0]*gx*gy;
+            decision_signal[i][a] += ptr[(pos+0)*step+1]*(1-gx)*(1-gy)+ptr[(pos+1)*step+1]*gx*(1-gy)+ptr[(pos+image->width_)*step+1]*(1-gx)*gy+ptr[step*(pos+image->width_+1)+1]*gx*gy;
+            decision_signal[i][a] += ptr[(pos+0)*step+2]*(1-gx)*(1-gy)+ptr[(pos+1)*step+2]*gx*(1-gy)+ptr[(pos+image->width_)*step+2]*(1-gx)*gy+ptr[step*(pos+image->width_+1)+2]*gx*gy;
+        }
+    }
+
+    float decision_signal_diff[2][decision_idSamples];
+    float decision_signal_diff_mean[2] = {0.0, 0.0};
+    // float decision_signal_diff_abs_mean[2] = {0.0, 0.0};
+    // float decision_signal_diff_variance[2] = {0.0, 0.0};
+    // float decision_signal_diff_abs_variance[2] = {0.0, 0.0};
+    // float decision_signal_diff_size[2] = {0.0, 0.0};
+
+    for(int a = 0; a < decision_idSamples; a++)
+    {
+        decision_signal_diff[0][a] = decision_signal[0][a] - decision_signal[1][a];
+        decision_signal_diff[1][a] = decision_signal[2][a] - decision_signal[3][a];
+        decision_signal_diff_mean[0] += decision_signal_diff[0][a];
+        decision_signal_diff_mean[1] += decision_signal_diff[1][a];
+        // decision_signal_diff_abs_mean[0] += abs(decision_signal_diff[0][a]);
+        // decision_signal_diff_abs_mean[1] += abs(decision_signal_diff[1][a]);
+        // decision_signal_diff_size[0] += abs(decision_signal_diff[0][a]) * abs(decision_signal_diff[0][a]);
+        // decision_signal_diff_size[1] += abs(decision_signal_diff[1][a]) * abs(decision_signal_diff[1][a]);
+    }
+    decision_signal_diff_mean[0] = decision_signal_diff_mean[0] / decision_idSamples;
+    decision_signal_diff_mean[1] = decision_signal_diff_mean[1] / decision_idSamples;
+    // decision_signal_diff_abs_mean[0] = decision_signal_diff_abs_mean[0] / decision_idSamples;
+    // decision_signal_diff_abs_mean[1] = decision_signal_diff_abs_mean[1] / decision_idSamples;
+    // decision_signal_diff_size[0] = sqrt(decision_signal_diff_size[0]);
+    // decision_signal_diff_size[1] = sqrt(decision_signal_diff_size[1]);
+    // printf("decision_signal_diff_mean         0 %.6f 1 %.6f\n", decision_signal_diff_mean[0], decision_signal_diff_mean[1]);
+    // printf("decision_signal_diff_abs_mean     0 %.6f 1 %.6f\n", decision_signal_diff_abs_mean[0], decision_signal_diff_abs_mean[1]);
+    // printf("decision_signal_diff_size         0 %.6f 1 %.6f\n", decision_signal_diff_size[0], decision_signal_diff_size[1]);
+
+    // for(int a = 0; a < decision_idSamples; a++)
+    // {
+    //     decision_signal_diff_variance[0] += (decision_signal_diff[0][a] - decision_signal_diff_mean[0]) * (decision_signal_diff[0][a] - decision_signal_diff_mean[0]);
+    //     decision_signal_diff_variance[1] += (decision_signal_diff[1][a] - decision_signal_diff_mean[1]) * (decision_signal_diff[1][a] - decision_signal_diff_mean[1]);
+    //     decision_signal_diff_abs_variance[0] += (abs(decision_signal_diff[0][a]) - decision_signal_diff_abs_mean[0]) * (abs(decision_signal_diff[0][a]) - decision_signal_diff_abs_mean[0]);
+    //     decision_signal_diff_abs_variance[1] += (abs(decision_signal_diff[1][a]) - decision_signal_diff_abs_mean[1]) * (abs(decision_signal_diff[1][a]) - decision_signal_diff_abs_mean[1]);
+    // }
+    // decision_signal_diff_variance[0] = decision_signal_diff_variance[0] / decision_idSamples;
+    // decision_signal_diff_variance[1] = decision_signal_diff_variance[1] / decision_idSamples;
+    // decision_signal_diff_abs_variance[0] = decision_signal_diff_abs_variance[0] / decision_idSamples;
+    // decision_signal_diff_abs_variance[1] = decision_signal_diff_abs_variance[1] / decision_idSamples;
+    // printf("decision_signal_diff_variance     0 %.6f 1 %.6f\n", decision_signal_diff_variance[0], decision_signal_diff_variance[1]);
+    // printf("decision_signal_diff_abs_variance 0 %.6f 1 %.6f\n", decision_signal_diff_abs_variance[0], decision_signal_diff_abs_variance[1]);
+
+    if(decision_signal_diff_mean[0] < decision_signal_diff_mean[1])
+        segIdx = 0;
+    else
+        segIdx = 1;
+
+    // printf("solutions [0] < [1]\n"
+    //     "mean     %d\n"
+    //     "mean abs %d\n"
+    //     "==         %d\n"
+    //     "var      %d\n"
+    //     "var abs  %d\n"
+    //     "==         %d\n"
+    //     "size     %d\n", decision_signal_diff_mean[0] < decision_signal_diff_mean[1], decision_signal_diff_abs_mean[0] < decision_signal_diff_abs_mean[1],
+    //                     (decision_signal_diff_mean[0] < decision_signal_diff_mean[1]) == (decision_signal_diff_abs_mean[0] < decision_signal_diff_abs_mean[1]),
+    //                     decision_signal_diff_variance[0] < decision_signal_diff_variance[1], decision_signal_diff_abs_variance[0] < decision_signal_diff_abs_variance[1],
+    //                     (decision_signal_diff_variance[0] < decision_signal_diff_variance[1]) == (decision_signal_diff_abs_variance[0] < decision_signal_diff_abs_variance[1]),
+    //                     decision_signal_diff_size[0] < decision_signal_diff_size[1]
+    //     );
+
+    // if((decision_signal_diff_mean[0] < decision_signal_diff_mean[1]) == (decision_signal_diff_abs_mean[0] < decision_signal_diff_abs_mean[1]))
+    // {
+    //     printf("ORIG decision_signal 0: ");
+    //     for (int a = 0; a < decision_idSamples; a++) printf("%.2f ", decision_signal[0][a] - decision_signal[1][a]);
+    //     // for (int a = 0; a < decision_idSamples; a++) printf("%.2f ", abs(decision_signal[0][a] - decision_signal[1][a]));
+    //     printf("\n");
+    //     printf("ORIG decision_signal 1: ");
+    //     for (int a = 0; a < decision_idSamples; a++) printf("%.2f ", decision_signal[2][a] - decision_signal[3][a]);
+    //     // for (int a = 0; a < decision_idSamples; a++) printf("%.2f ", abs(decision_signal[2][a] - decision_signal[3][a]));
+    //     printf("\n");
+    // }
 
     tracked_object.u = ellipse_centers.u[segIdx];
     tracked_object.v = ellipse_centers.v[segIdx];
@@ -761,7 +948,50 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
             image->data_[step * pos + 1] = (unsigned char)(255.0 * a / idSamples);
             image->data_[step * pos + 2] = 0;
         }
+        // pos = ((int)x[(segIdx + 1) % 2][a] + ((int)y[(segIdx + 1) % 2][a]) * image->width_);
+        // if (pos > 0 && pos < image->width_ * image->height_)
+        // {
+        //     image->data_[step * pos + 0] = (unsigned char)(255.0 * a / idSamples);
+        //     image->data_[step * pos + 1] = 0;
+        //     image->data_[step * pos + 2] = 0;
+        // }
     }
+    // image->draw_point(ellipse_centers.u[0] * (37.0 / 70.0) + (33.0 / 70.0) * outer.x, ellipse_centers.v[0] * (37.0 / 70.0) + (33.0 / 70.0) * outer.y, \
+    //     segIdx * 255, ((segIdx + 1) % 2) * 255, 0);
+    // image->draw_point(ellipse_centers.u[1] * (37.0 / 70.0) + (33.0 / 70.0) * outer.x, ellipse_centers.v[1] * (37.0 / 70.0) + (33.0 / 70.0) * outer.y, \
+    //     ((segIdx + 1) % 2) * 255, segIdx * 255, 0);
+
+    // for (int a = 0; a < decision_idSamples; a++)
+    // {
+    //     pos = ((int)decision_x[0][a] + ((int)decision_y[0][a]) * image->width_);
+    //     if (pos > 0 && pos < image->width_ * image->height_)
+    //     {
+    //         image->data_[step * pos + 0] = 255;//(unsigned char)(255.0 * a / decision_idSamples);
+    //         image->data_[step * pos + 1] = 0;
+    //         image->data_[step * pos + 2] = 0;
+    //     }
+    //     pos = ((int)decision_x[1][a] + ((int)decision_y[1][a]) * image->width_);
+    //     if (pos > 0 && pos < image->width_ * image->height_)
+    //     {
+    //         image->data_[step * pos + 0] = 255;//(unsigned char)(255.0 * a / decision_idSamples);
+    //         image->data_[step * pos + 1] = 0;
+    //         image->data_[step * pos + 2] = 0;
+    //     }
+    //     pos = ((int)decision_x[2][a] + ((int)decision_y[2][a]) * image->width_);
+    //     if (pos > 0 && pos < image->width_ * image->height_)
+    //     {
+    //         image->data_[step * pos + 0] = 0;
+    //         image->data_[step * pos + 1] = 255;//(unsigned char)(255.0 * a / decision_idSamples);
+    //         image->data_[step * pos + 2] = 0;
+    //     }
+    //     pos = ((int)decision_x[3][a] + ((int)decision_y[3][a]) * image->width_);
+    //     if (pos > 0 && pos < image->width_ * image->height_)
+    //     {
+    //         image->data_[step * pos + 0] = 0;
+    //         image->data_[step * pos + 1] = 255;//(unsigned char)(255.0 * a / decision_idSamples);
+    //         image->data_[step * pos + 2] = 0;
+    //     }
+    // }
 }
 
 void CCircleDetect::ambiguityPlain()

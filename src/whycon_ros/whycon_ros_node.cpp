@@ -105,14 +105,14 @@ void CWhyconROSNode::reconfigureCallback(whycon::whyconConfig& config, uint32_t 
         "areaRatioTolerance %lf\n"
         "centerDistanceToleranceRatio %lf centerDistanceToleranceAbs %lf\n",
         (config.identify) ? "True" : "False",
-        config.circleDiameter, config.numMarkers, config.minSize, config.fieldLength,
+        config.circle_diam, config.num_markers, config.min_size, config.fieldLength,
         config.fieldWidth, config.initialCircularityTolerance,
         config.finalCircularityTolerance, config.areaRatioTolerance,
         config.centerDistanceToleranceRatio, config.centerDistanceToleranceAbs
         );
 
     whycon_.updateConfiguration(
-        config.identify, config.circleDiameter, config.numMarkers, config.minSize,
+        config.identify, config.circle_diam, config.num_markers, config.min_size,
         config.fieldLength, config.fieldWidth, config.initialCircularityTolerance,
         config.finalCircularityTolerance, config.areaRatioTolerance,
         config.centerDistanceToleranceRatio, config.centerDistanceToleranceAbs
@@ -215,14 +215,14 @@ void CWhyconROSNode::imageCallback(const sensor_msgs::Image::ConstPtr &msg)
             visual_marker.pose.orientation.z = detection.obj.qz;
             visual_marker.pose.orientation.w = detection.obj.qw;
 
-            visual_marker.scale.x = 0.2;//circleDiameter;  // meters
+            visual_marker.scale.x = 0.01;//circleDiameter;  // meters
             visual_marker.scale.y = 0.2;//circleDiameter;
-            visual_marker.scale.z = 0.01;
+            visual_marker.scale.z = 0.2;
             visual_marker.color.r = 0.0;
             visual_marker.color.g = 1.0;
             visual_marker.color.b = 0.0;
             visual_marker.color.a = 1.0;
-            visual_marker.lifetime = ros::Duration(0.1);  // secs
+            visual_marker.lifetime = ros::Duration(0.2);  // secs
             visual_marker.frame_locked = true;
 
             visual_array.markers.push_back(visual_marker);
@@ -230,8 +230,8 @@ void CWhyconROSNode::imageCallback(const sensor_msgs::Image::ConstPtr &msg)
     }
 
     // publishing detected markers
-    if(marker_array.markers.size() > 0)
-    {
+    // if(marker_array.markers.size() > 0)
+    // {
         markers_pub_.publish(marker_array);
 
         if(publish_visual_)
@@ -239,7 +239,7 @@ void CWhyconROSNode::imageCallback(const sensor_msgs::Image::ConstPtr &msg)
 
         for(int i = 0; i < transform_array.size(); i++)
             tf_broad_.sendTransform(transform_array[i]);
-    }
+    // }
 
     if(use_gui_)
     {
@@ -252,11 +252,12 @@ void CWhyconROSNode::imageCallback(const sensor_msgs::Image::ConstPtr &msg)
 
 void CWhyconROSNode::start()
 {
-    while(ros::ok())
-    {
-        ros::spinOnce();
-        usleep(30000);
-    }
+    // while(ros::ok())
+    // {
+    //     ros::spinOnce();
+    //     usleep(30000);
+    // }
+    ros::spin();
 }
 
 CWhyconROSNode::CWhyconROSNode()
