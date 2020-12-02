@@ -534,7 +534,7 @@ SMarker CCircleDetect::findSegment(CRawImage* image, SSegment init)
     }
 
     // drawing results 
-    if (outer.valid)// && false)
+    if (outer.valid && false)
     {
         for (int p = queueOldStart; p < queueEnd; p++)
         {
@@ -545,9 +545,9 @@ SMarker CCircleDetect::findSegment(CRawImage* image, SSegment init)
         }
     }
 
-    // image->draw_point(outer.x, outer.y, 0, 0, 0);
-    // image->draw_point(ellipse_centers.u[0], ellipse_centers.v[0], 255, 0, 0);
-    // image->draw_point(ellipse_centers.u[1], ellipse_centers.v[1], 0, 255, 0);
+    image->draw_point(outer.x, outer.y, 0, 0, 0);
+    image->draw_point(ellipse_centers.u[0], ellipse_centers.v[0], 255, 0, 0);
+    image->draw_point(ellipse_centers.u[1], ellipse_centers.v[1], 0, 255, 0);
 
     if (draw_)
     {
@@ -704,8 +704,8 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
         // printf("meanX %f meanY %f directX %f directY %f\n", meanX, meanY, directX / numPoints[i], directY / numPoints[i]);
         float errX, errY;
 
-        // float meanAng = atan2(sy, sx);
-        // std::vector<float> errs;
+        float meanAng = atan2(sy, sx);
+        std::vector<float> errs;
 
         sx = sy = 0;
         if (smooth[i][idSamples - 1] != smooth[i][0])
@@ -716,24 +716,24 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
             {
                 sx = cos(2 * M_PI * a / segmentWidth);
                 sy = sin(2 * M_PI * a / segmentWidth);
-                // float tmpAng = atan2(sy, sx);
-                // errs.push_back(atan2(sin(meanAng - tmpAng), cos(meanAng - tmpAng)));
+                float tmpAng = atan2(sy, sx);
+                errs.push_back(atan2(sin(meanAng - tmpAng), cos(meanAng - tmpAng)));
                 errX = sx - meanX;
                 errY = sy - meanY;
                 sum[i] += errX * errX + errY * errY;
                 // printf("sx %f sy %f errX %f errY %f dirX %f dirY %f dirEX %f dirEY %f\n", sx, sy, errX, errY, x[i][a], y[i][a], x[i][a] - (directX / numPoints[i]), y[i][a] - (directY / numPoints[i]));
             }
         }
-        // float sumSin = 0;
-        // float sumCos = 0;
-        // for(auto e : errs){
-        //     sumSin += sin(e);
-        //     sumCos += cos(e);
-        // }
-        // sumSin /= (float)errs.size();
-        // sumCos /= (float)errs.size();
-        // float valR = sqrt(sumSin * sumSin + sumCos * sumCos);
-        // float stdAng = sqrt(-2 * log(valR));
+        float sumSin = 0;
+        float sumCos = 0;
+        for(auto e : errs){
+            sumSin += sin(e);
+            sumCos += cos(e);
+        }
+        sumSin /= (float)errs.size();
+        sumCos /= (float)errs.size();
+        float valR = sqrt(sumSin * sumSin + sumCos * sumCos);
+        float stdAng = sqrt(-2 * log(valR));
 
         variance[i] = sum[i] / numPoints[i];
         // printf("idx %d stdAngErr %.9f var %.12f sum %.12f numPoints %.0f\n", i, stdAng, variance[i], sum[i], numPoints[i]);
@@ -764,30 +764,39 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
         for (int a = 0; a < idSamples; a++) printf("%.2f ", smooth[1][a]);
         printf("\n"); */
 
-    int decision_idSamples = 360;
-    float decision_x[4][decision_idSamples];
-    float decision_y[4][decision_idSamples];
-    float decision_signal[4][decision_idSamples];
-
     float center_dist = sqrt((ellipse_centers.u[0] - ellipse_centers.u[1]) * (ellipse_centers.u[0] - ellipse_centers.u[1]) + \
             (ellipse_centers.v[0] - ellipse_centers.v[1]) * (ellipse_centers.v[0] - ellipse_centers.v[1]));
 
     // printf("out-el0 %f out-el1 %f el0-el1 %f m0 %f m1 %f\n", \
     //     sqrt((outer.x - ellipse_centers.u[0]) * (outer.x - ellipse_centers.u[0]) + (outer.y - ellipse_centers.v[0]) * (outer.y - ellipse_centers.v[0])),
     //     sqrt((outer.x - ellipse_centers.u[1]) * (outer.x - ellipse_centers.u[1]) + (outer.y - ellipse_centers.v[1]) * (outer.y - ellipse_centers.v[1])),
-    //     sqrt((ellipse_centers.u[0] - ellipse_centers.u[1]) * (ellipse_centers.u[0] - ellipse_centers.u[1]) + \
-    //         (ellipse_centers.v[0] - ellipse_centers.v[1]) * (ellipse_centers.v[0] - ellipse_centers.v[1])),
-    //     0.42 / 0.70 * outer.m0,
-    //     0.42 / 0.70 * outer.m1
-    //     );
+    //     center_dist, 0.42 / 0.70 * outer.m0, 0.42 / 0.70 * outer.m1);
 
-    float decision_ratio = 7.0;
+    int decision_idSamples = 360;
+    float decision_x[4][decision_idSamples];
+    float decision_y[4][decision_idSamples];
+    float decision_signal[4][decision_idSamples];
+
     float decision_outer_ratio = 0.42 / 0.70;
 
-    tmp[0].m0 = decision_outer_ratio * outer.m0;
-    tmp[0].m1 = decision_outer_ratio * outer.m1;
+    tmp[0].m0 = outer.m0;
+    tmp[0].m1 = outer.m1;
     tmp[0].v0 = outer.v0;
     tmp[0].v1 = outer.v1;
+
+    // float decision_shrink_proportion = 0.6;
+    // float decision_shrink_ratio = (tmp[0].m1 - decision_shrink_proportion * center_dist) / tmp[0].m1;
+    float decision_shrink_ratio = 1.0 - 1e-6;//0.90 + decision_shrink_proportion * center_dist / tmp[0].m1;
+    // if(decision_shrink_ratio > 1.0)
+    // {
+    //     printf("clipping decision_shrink_ratio !!!\n");
+    //     decision_shrink_ratio = 1.0 - 1e-6;
+    // }
+    // else
+    // {
+    //     decision_shrink_ratio = decision_shrink_ratio;
+    // }
+    // printf("ratios out %f shrink %f proportion %f\n", decision_outer_ratio, decision_shrink_ratio, decision_shrink_proportion);
 
     tmp[1] = tmp[0];
     tmp[2] = tmp[0];
@@ -795,19 +804,23 @@ void CCircleDetect::ambiguityAndObtainCode(CRawImage *image)
 
     tmp[0].x = ellipse_centers.u[0] + (outer.x - ellipse_centers.u[0]) * decision_outer_ratio;
     tmp[0].y = ellipse_centers.v[0] + (outer.y - ellipse_centers.v[0]) * decision_outer_ratio;
+    tmp[0].m0 = outer.m0 * decision_outer_ratio;
+    tmp[0].m1 = outer.m1 * decision_outer_ratio;
 
-    tmp[1].x = (ellipse_centers.u[0] + (outer.x - ellipse_centers.u[0]) * decision_outer_ratio * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1));
-    tmp[1].y = (ellipse_centers.v[0] + (outer.y - ellipse_centers.v[0]) * decision_outer_ratio * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1));
-    tmp[1].m0 = tmp[0].m0 * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1);
-    tmp[1].m1 = tmp[0].m1 * ((tmp[0].m1 - center_dist / decision_ratio) / tmp[0].m1);
+    tmp[1].x = ellipse_centers.u[0] + (outer.x - ellipse_centers.u[0]) * decision_outer_ratio * decision_shrink_ratio;
+    tmp[1].y = ellipse_centers.v[0] + (outer.y - ellipse_centers.v[0]) * decision_outer_ratio * decision_shrink_ratio;
+    tmp[1].m0 = outer.m0 * decision_outer_ratio * decision_shrink_ratio;
+    tmp[1].m1 = outer.m1 * decision_outer_ratio * decision_shrink_ratio;
 
     tmp[2].x = ellipse_centers.u[1] + (outer.x - ellipse_centers.u[1]) * decision_outer_ratio;
     tmp[2].y = ellipse_centers.v[1] + (outer.y - ellipse_centers.v[1]) * decision_outer_ratio;
+    tmp[2].m0 = outer.m0 * decision_outer_ratio;
+    tmp[2].m1 = outer.m1 * decision_outer_ratio;
 
-    tmp[3].x = (ellipse_centers.u[1] + (outer.x - ellipse_centers.u[1]) * decision_outer_ratio * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1));
-    tmp[3].y = (ellipse_centers.v[1] + (outer.y - ellipse_centers.v[1]) * decision_outer_ratio * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1));
-    tmp[3].m0 = tmp[2].m0 * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1);
-    tmp[3].m1 = tmp[2].m1 * ((tmp[2].m1 - center_dist / decision_ratio) / tmp[2].m1);
+    tmp[3].x = ellipse_centers.u[1] + (outer.x - ellipse_centers.u[1]) * decision_outer_ratio * decision_shrink_ratio;
+    tmp[3].y = ellipse_centers.v[1] + (outer.y - ellipse_centers.v[1]) * decision_outer_ratio * decision_shrink_ratio;
+    tmp[3].m0 = outer.m0 * decision_outer_ratio * decision_shrink_ratio;
+    tmp[3].m1 = outer.m1 * decision_outer_ratio * decision_shrink_ratio;
 
     for(int i = 0; i < 4; i++)
     {
